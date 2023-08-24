@@ -128,7 +128,7 @@ const extendBooking = async (req: Request, res: Response, next: NextFunction) =>
 }
 
 
-async function isDateRangeAvailable(checkInDate: Date, numberOfNights: number, unitID: string) {
+async function isDateRangeAvailable(checkInDate: Date, numberOfNights: number, unitID: string): Promise<boolean> {
     const newCheckOutDate = getCheckoutDate(checkInDate, numberOfNights);
 
     for (const booking of await getAllBookingsOnUnit(unitID)) {
