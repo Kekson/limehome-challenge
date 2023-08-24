@@ -1,6 +1,6 @@
-import axios, { AxiosError } from 'axios';
-import { startServer, stopServer } from '../source/server';
-import { PrismaClient } from '@prisma/client';
+import axios, {AxiosError} from 'axios';
+import {startServer, stopServer} from '../source/server';
+import {PrismaClient} from '@prisma/client';
 
 const GUEST_A_UNIT_1 = {
     unitID: '1',
@@ -117,14 +117,75 @@ describe('Booking API', () => {
         expect(response1.data.guestName).toBe(GUEST_A_UNIT_1.guestName);
 
         // GuestB trying to book a unit that is already occupied
+        let error: any;
+        try {
+            const response2 = await axios.post('http://localhost:8000/api/v1/booking', {
+                unitID: '1',
+                guestName: 'GuestB',
+                checkInDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                numberOfNights: 5
+            });
+        } catch (e) {
+            error = e;
+        }
+
+        expect(error).toBeInstanceOf(AxiosError);
+        expect(error.response.status).toBe(400);
+        expect(error.response.data).toEqual('For the given check-in date, the unit is already occupied');
+    });
+
+
+    test('Same guest extends booking', async () => {
+        // Create first booking
+        const response1 = await axios.post('http://localhost:8000/api/v1/booking', GUEST_A_UNIT_1);
+        expect(response1.status).toBe(200);
+        expect(response1.data.guestName).toBe(GUEST_A_UNIT_1.guestName);
+
+        // GuestA trying to extend a booking
+        const response2 = await axios.post('http://localhost:8000/api/v1/extend-booking', {
+            unitID: '1',
+            guestName: 'GuestA',
+            numberOfNights: 2
+        });
+
+
+        expect(response2.status).toBe(200);
+        expect(response2.data.guestName).toEqual('GuestA');
+        expect(response2.data.numberOfNights).toBe(7);
+    });
+
+    test('Same guest tries to extend already reserved unit', async () => {
+        // GuestA Creates first booking
+        const response1 = await axios.post('http://localhost:8000/api/v1/booking', GUEST_A_UNIT_1);
+        expect(response1.status).toBe(200);
+        expect(response1.data.guestName).toBe(GUEST_A_UNIT_1.guestName);
+
+        // GuestB also reserves the same unit on GuestA's check-out date
+        const guestACheckOutDate = new Date(new Date(GUEST_A_UNIT_1.checkInDate).getTime() + GUEST_A_UNIT_1.numberOfNights * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const response2 = await axios.post('http://localhost:8000/api/v1/booking', {
             unitID: '1',
             guestName: 'GuestB',
-            checkInDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            checkInDate: guestACheckOutDate,
             numberOfNights: 5
-        });
 
-        expect(response2.status).toBe(400);
-        expect(response2.data.detail).toBe('For the given check-in date, the unit is already occupied');
+        });
+        expect(response2.status).toBe(200);
+        expect(response2.data.guestName).toBe('GuestB');
+
+        // GuestA now tries to extend a booking
+        let error: any;
+        try {
+            const response3 = await axios.post('http://localhost:8000/api/v1/extend-booking', {
+                unitID: '1',
+                guestName: 'GuestA',
+                numberOfNights: 2
+            });
+        } catch (e) {
+            error = e;
+        }
+
+        expect(error).toBeInstanceOf(AxiosError);
+        expect(error.response.status).toBe(400);
+        expect(error.response.data).toEqual('extend booking is not possible, this unit is already reserved by other customer');
     });
 });

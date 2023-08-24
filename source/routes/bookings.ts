@@ -4,5 +4,6 @@ const router = express.Router();
 
 router.get('/', controller.healthCheck);
 router.post('/api/v1/booking/', controller.createBooking);
+router.post('/api/v1/extend-booking/', controller.extendBooking);
 
 export = router;
